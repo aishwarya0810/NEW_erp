@@ -1,0 +1,31 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_controller_1 = require("../controllers/auth.controller");
+const auth_service_1 = require("../services/auth.service");
+const user_repository_1 = require("../repositories/user.repository");
+const refreshToken_repository_1 = require("../repositories/refreshToken.repository");
+const hash_service_1 = require("../services/hash.service");
+const audit_repository_1 = require("../repositories/audit.repository");
+const validation_middleware_1 = require("../middlewares/validation.middleware");
+const auth_validator_1 = require("../validators/auth.validator");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const role_middleware_1 = require("../middlewares/role.middleware");
+const router = (0, express_1.Router)();
+// Instantiate Layer dependencies (Dependency Injection)
+const userRepository = new user_repository_1.UserRepository();
+const tokenRepository = new refreshToken_repository_1.RefreshTokenRepository();
+const auditRepository = new audit_repository_1.AuditRepository();
+const hashService = new hash_service_1.HashService();
+const authService = new auth_service_1.AuthService(userRepository, tokenRepository, hashService);
+const authController = new auth_controller_1.AuthController(authService, auditRepository);
+// Wire API Endpoints to Middlewares and Handlers
+router.post('/register', (0, validation_middleware_1.validate)(auth_validator_1.registerSchema), authController.register);
+router.post('/login', (0, validation_middleware_1.validate)(auth_validator_1.loginSchema), authController.login);
+router.post('/refresh', authController.refresh);
+router.post('/logout', authController.logout);
+router.get('/me', auth_middleware_1.protect, authController.getMe);
+router.get('/users', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN'), authController.getUsers);
+router.get('/roles', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN'), authController.getRoles);
+router.patch('/users/:id/role', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN'), authController.updateUserRole);
+exports.default = router;

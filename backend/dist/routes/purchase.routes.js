@@ -1,0 +1,31 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const purchase_controller_1 = require("../controllers/purchase.controller");
+const purchase_service_1 = require("../services/purchase.service");
+const purchase_repository_1 = require("../repositories/purchase.repository");
+const product_repository_1 = require("../repositories/product.repository");
+const supplier_repository_1 = require("../repositories/supplier.repository");
+const audit_repository_1 = require("../repositories/audit.repository");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const role_middleware_1 = require("../middlewares/role.middleware");
+const router = (0, express_1.Router)();
+const purchaseRepository = new purchase_repository_1.PurchaseRepository();
+const productRepository = new product_repository_1.ProductRepository();
+const supplierRepository = new supplier_repository_1.SupplierRepository();
+const auditRepository = new audit_repository_1.AuditRepository();
+const purchaseService = new purchase_service_1.PurchaseService(purchaseRepository, productRepository, supplierRepository, auditRepository);
+const purchaseController = new purchase_controller_1.PurchaseController(purchaseService);
+// Suppliers
+router.get('/suppliers', auth_middleware_1.protect, purchaseController.getSuppliers);
+router.get('/suppliers/:id', auth_middleware_1.protect, purchaseController.getSupplierById);
+router.post('/suppliers', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'MANAGER'), purchaseController.createSupplier);
+router.put('/suppliers/:id', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'MANAGER'), purchaseController.updateSupplier);
+router.delete('/suppliers/:id', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN'), purchaseController.deleteSupplier);
+// Purchase Orders
+router.get('/orders', auth_middleware_1.protect, purchaseController.getPurchaseOrders);
+router.get('/orders/:id', auth_middleware_1.protect, purchaseController.getPurchaseOrderById);
+router.post('/orders', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'MANAGER'), purchaseController.createPurchaseOrder);
+router.patch('/orders/:id/status', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'MANAGER'), purchaseController.updateStatus);
+router.post('/orders/:id/receive', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'MANAGER', 'WAREHOUSE_MANAGER'), purchaseController.receiveOrder);
+exports.default = router;

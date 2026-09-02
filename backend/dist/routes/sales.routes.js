@@ -1,0 +1,30 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const sales_controller_1 = require("../controllers/sales.controller");
+const sales_service_1 = require("../services/sales.service");
+const sales_repository_1 = require("../repositories/sales.repository");
+const product_repository_1 = require("../repositories/product.repository");
+const warehouse_repository_1 = require("../repositories/warehouse.repository");
+const audit_repository_1 = require("../repositories/audit.repository");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const role_middleware_1 = require("../middlewares/role.middleware");
+const router = (0, express_1.Router)();
+const salesRepository = new sales_repository_1.SalesRepository();
+const productRepository = new product_repository_1.ProductRepository();
+const warehouseRepository = new warehouse_repository_1.WarehouseRepository();
+const auditRepository = new audit_repository_1.AuditRepository();
+const salesService = new sales_service_1.SalesService(salesRepository, productRepository, warehouseRepository, auditRepository);
+const salesController = new sales_controller_1.SalesController(salesService);
+// Customers
+router.get('/customers', auth_middleware_1.protect, salesController.getCustomers);
+router.get('/customers/:id', auth_middleware_1.protect, salesController.getCustomerById);
+router.post('/customers', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'SALES_STAFF'), salesController.createCustomer);
+router.put('/customers/:id', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'SALES_STAFF'), salesController.updateCustomer);
+// Sales Orders
+router.get('/orders', auth_middleware_1.protect, salesController.getSalesOrders);
+router.get('/orders/:id', auth_middleware_1.protect, salesController.getSalesOrderById);
+router.post('/orders', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'SALES_STAFF'), salesController.createSalesOrder);
+router.patch('/orders/:id/status', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'SALES_STAFF', 'MANAGER'), salesController.updateStatus);
+router.post('/orders/:id/ship', auth_middleware_1.protect, (0, role_middleware_1.requireRoles)('ADMIN', 'SALES_STAFF', 'WAREHOUSE_MANAGER'), salesController.shipOrder);
+exports.default = router;
