@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # ========================================================
+  # 1. DATABASE SERVICE (PostgreSQL)
+  # ========================================================
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: stockpilot_db
+    restart: always
+    environment:
+      POSTGRES_USER: erp_user
+      POSTGRES_PASSWORD: erp_password_123
+      POSTGRES_DB: stockpilot_erp
+    ports:
+      - "5435:5432" # Host port 5435 mapped to container 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - stockpilot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_user -d stockpilot_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ========================================================
+  # 2. BACKEND SERVICE (Node.js + Express API)
+  # ========================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stockpilot_backend
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      PORT: 5001
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://erp_user:erp_password_123@postgres_db:5432/stockpilot_erp?schema=public"
+      JWT_SECRET: "super_secret_jwt_key_stockpilot_98765"
+      JWT_ACCESS_EXPIRATION: "15m"
+      JWT_REFRESH_EXPIRATION: "7d"
+      COOKIE_SECRET: "super_secret_cookie_key"
+      CLIENT_URL: "http://localhost:3000"
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    networks:
+      - stockpilot_network
+
+  # ========================================================
+  # 3. FRONTEND SERVICE (Next.js)
+  # ========================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: stockpilot_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: "http://localhost:5001/api"
+    depends_on:
+      - backend
+    networks:
+      - stockpilot_network
+
+# ==========================================================
+# VOLUMES & NETWORKS
+# ==========================================================
+volumes:
+  postgres_data:
+
+networks:
+  stockpilot_network:
+    driver: bridge

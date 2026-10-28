@@ -1,62 +1,34 @@
-# ==========================================
-# 1. Build Backend Stage
-# ==========================================
-FROM node:20-alpine AS backend-builder
-WORKDIR /app/backend
-
-# Install dependencies
-COPY backend/package*.json ./
+# Stage 1: Dependencies
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
 RUN npm ci
 
-# Generate Prisma Client
-COPY backend/prisma ./prisma
-RUN npx prisma generate
+# Stage 2: Builder
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-# Build Backend
-COPY backend/ ./
+# Build argument backend API URL ke liye
+ARG NEXT_PUBLIC_API_URL=http://localhost:5001/api
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN npm run build
 
-# ==========================================
-# 2. Build Frontend Stage
-# ==========================================
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app/frontend
-
-# Install dependencies
-COPY frontend/package*.json ./
-RUN npm ci
-
-# Build Frontend
-COPY frontend/ ./
-RUN npm run build
-
-# ==========================================
-# 3. Final Production Stage
-# ==========================================
-FROM node:20-alpine
+# Stage 3: Runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install PM2 globally to manage multiple processes
-RUN npm install -g pm2
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# Copy Backend Build & Dependencies
-COPY --from=backend-builder /app/backend/package*.json ./backend/
-COPY --from=backend-builder /app/backend/node_modules ./backend/node_modules
-COPY --from=backend-builder /app/backend/dist ./backend/dist
-COPY --from=backend-builder /app/backend/prisma ./backend/prisma
+# Public aur static assets copy karein
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-# Copy Frontend Build & Dependencies
-COPY --from=frontend-builder /app/frontend/package*.json ./frontend/
-COPY --from=frontend-builder /app/frontend/node_modules ./frontend/node_modules
-COPY --from=frontend-builder /app/frontend/.next ./frontend/.next
-COPY --from=frontend-builder /app/frontend/public ./frontend/public
-COPY --from=frontend-builder /app/frontend/next.config.ts ./frontend/next.config.ts
+EXPOSE 3000
 
-# Copy PM2 ecosystem file
-COPY ecosystem.config.js .
-
-# Expose both ports (3000 for frontend, 5000 for backend)
-EXPOSE 3000 5000
-
-# Start both services using PM2
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+CMD ["node", "server.js"]
